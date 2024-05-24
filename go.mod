@@ -1,4 +1,4 @@
-module github.com/aliyun/pop
+module github.com/aliyun/openapi
 
 go 1.18
 

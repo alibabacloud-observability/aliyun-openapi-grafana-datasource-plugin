@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/aliyun/pop/pkg/plugin"
+	"github.com/aliyun/openapi/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"os"

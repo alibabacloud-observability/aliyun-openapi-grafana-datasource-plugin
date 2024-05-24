@@ -121,6 +121,7 @@ type Cache struct {
 	data sync.Map
 }
 
+// Set 将给定的键值对存储到缓存中，并根据指定的持续时间设置过期机制。
 func (cache *Cache) Set(key *openapi.Config, value interface{}, duration time.Duration) {
 	cache.data.Store(key, value)
 
@@ -131,7 +132,9 @@ func (cache *Cache) Set(key *openapi.Config, value interface{}, duration time.Du
 	}
 }
 
-// Get 如果用loadorstore还要生成client,这样的cache没有意义.
+// Get 从缓存中获取给定配置键对应的 openapi 客户端。
+// 如果缓存中存在该键，则直接返回对应的客户端实例；
+// 如果缓存中不存在，则创建一个新的客户端实例，并加入缓存。
 func (cache *Cache) Get(key *openapi.Config) (*openapi.Client, error) {
 	value, ok := cache.data.Load(key)
 	if ok {
@@ -150,7 +153,6 @@ func (cache *Cache) Get(key *openapi.Config) (*openapi.Client, error) {
 var GlobalCache = &Cache{}
 
 func (apiDatasource *APIDatasource) BuildClient(setting *APISource, param map[string]interface{}, product string) (*openapi.Client, error) {
-	// TODO:支持缓存的client, map, key是config
 	regex := regexp.MustCompile(`\[([^\]]+)\]`)
 	endpoint := setting.ProductConfigs[product].Endpoint
 	flag := regex.MatchString(endpoint)
@@ -167,7 +169,6 @@ func (apiDatasource *APIDatasource) BuildClient(setting *APISource, param map[st
 			AccessKeyId:     &setting.AccessKeyId,
 			AccessKeySecret: &setting.AccessKeySecret,
 		}
-		log.DefaultLogger.Debug("config finish without []", "config", config)
 	} else {
 		keys := []string{"RegionId", "Region"}
 		region1, exists := getValueIgnoreCase(param, keys)
@@ -183,10 +184,8 @@ func (apiDatasource *APIDatasource) BuildClient(setting *APISource, param map[st
 			AccessKeyId:     &setting.AccessKeyId,
 			AccessKeySecret: &setting.AccessKeySecret,
 		}
-		log.DefaultLogger.Debug("config finish with []", "config", config)
 	}
 	client, err := GlobalCache.Get(config)
-	// client, err := openapi.NewClient(config)
 	return client, err
 }
 
@@ -202,8 +201,7 @@ func mapToQueryParams(data map[string]interface{}, prefix string, queries map[st
 }
 
 func processValue(value interface{}, prefix string, queries map[string]string) {
-	log.DefaultLogger.Info("processValue", "value", value, "prefix", prefix, "queries", queries)
-	log.DefaultLogger.Info("value type", reflect.TypeOf(value))
+	// log.DefaultLogger.Debug("processValue", "value", value, "prefix", prefix, "queries", queries)
 	rValue := reflect.ValueOf(value)
 	switch rValue.Kind() {
 	case reflect.Map:
@@ -248,7 +246,6 @@ func (apiDatasource *APIDatasource) QueryAPI(ch chan Result, query backend.DataQ
 	}()
 
 	// 前端的query解析为查询的参数
-	log.DefaultLogger.Info("unmarshal queryInfo", query.JSON)
 	err := json.Unmarshal([]byte(query.JSON), &queryInfo)
 	if err != nil {
 		log.DefaultLogger.Error("Unmarshal queryInfo", "refId", refId, "error", err)
@@ -259,11 +256,10 @@ func (apiDatasource *APIDatasource) QueryAPI(ch chan Result, query backend.DataQ
 		}
 		return
 	}
-	log.DefaultLogger.Info("marshal queryInfo", queryInfo)
 
 	if !strings.HasSuffix(setting.ProductConfigs[queryInfo.Product].Endpoint, "aliyuncs.com") {
 		err = errors.New("endpoint is not end with aliyuncs.com, Illegal Endpoint")
-		log.DefaultLogger.Debug("Endpoint is not end with aliyuncs.com, Illegal Endpoint")
+		log.DefaultLogger.Info("Endpoint is not end with aliyuncs.com, Illegal Endpoint")
 		ch <- Result{
 			refId:        refId,
 			dataResponse: response,
@@ -280,14 +276,8 @@ func (apiDatasource *APIDatasource) QueryAPI(ch chan Result, query backend.DataQ
 	//创建查询参数
 	params := CreateApiInfo(queryInfo, setting)
 
-	log.DefaultLogger.Info("Type of queryInfo.Params", reflect.TypeOf(queryInfo.Params))
-
-	log.DefaultLogger.Info("query Info Parmas", queryInfo.Params)
 	queries := make(map[string]string)
 	mapToQueryParams(queryInfo.Params, "", queries)
-	for key, value := range queries {
-		log.DefaultLogger.Info("key and value\n", key, value)
-	}
 
 	log.DefaultLogger.Info("query params,", queries)
 	log.DefaultLogger.Info("API params,", params)

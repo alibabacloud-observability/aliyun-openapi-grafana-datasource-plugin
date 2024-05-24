@@ -100,19 +100,19 @@ const ProductConfigItemEditor = ({
       <InlineFieldRow>
         <div className='gf-form-label' style={{ width: '32px', padding: '0 8px 0 12px'}} onClick={addProduct}>+</div>
         <div className='gf-form-label' style={{ width: '32px', padding: '0 8px 0 12px'}} onClick={remove}>-</div>
-        <InlineField label="product" labelWidth={8}>
+        <InlineField label="Product" labelWidth={8}>
           <Select
-            width={30}
+            width={33}
             allowCustomValue={true}
             options={ProductsOptions}
             onChange={e => onProductChange(e)}
             value={productName}
-            placeholder="please select or input  product"
+            placeholder="please select or input product"
           />
         </InlineField>
-        <InlineField label="endpoint" labelWidth={8}>
+        <InlineField label="Endpoint" labelWidth={8}>
           <Input
-            width={30}
+            width={33}
             placeholder='please enter endpoint'
             value={endpoint}
             onChange={(e: any) => onInputChange(e, 'endpoint')}
@@ -132,7 +132,7 @@ const ProductConfigItemEditor = ({
         <div className="gf-form" style={{marginLeft: '72px'}}>
           <InlineField labelWidth={8} label="Version">
             <Input
-              width={30}
+              width={33}
               placeholder='please enter version'
               value={version}
               onChange={(e: any) => onInputChange(e, 'version')}
@@ -142,7 +142,7 @@ const ProductConfigItemEditor = ({
           </InlineField>
           <InlineField labelWidth={8} label="Style">
             <Input
-              width={30}
+              width={33}
               placeholder='please enter style'
               value={style}
               onChange={(e: any) => onInputChange(e, 'style')}

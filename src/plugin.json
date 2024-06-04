@@ -5,6 +5,7 @@
   "id": "aliyun-openapi-grafana-datasource-plugin",
   "metrics": true,
   "backend": true,
+  "alerting": true,
   "executable": "gpx_pop",
   "info": {
     "description": "",

@@ -2,14 +2,15 @@ package plugin
 
 import (
 	"fmt"
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// 判断不区分大小写的键是否存在于 map[string] 中，并获取对应的值
-func getValueIgnoreCase(data map[string]interface{}, keys []string) (interface{}, bool) {
+// GetValueIgnoreCase 判断不区分大小写的键是否存在于 map[string] 中，并获取对应的值
+func GetValueIgnoreCase(data map[string]interface{}, keys []string) (interface{}, bool) {
 	for _, key := range keys {
 		for k, v := range data {
 			if strings.EqualFold(k, key) {
@@ -20,30 +21,79 @@ func getValueIgnoreCase(data map[string]interface{}, keys []string) (interface{}
 	return "", false
 }
 
-// 时间正则匹配
-// formatDateTime 根据给定的格式字符串（如 "${__from:date:iso}"、"${__from:date:iso+n}"、"${__from:date:iso-n}" 或 "${__from:date}"）和时间戳，
+var datePatternRegex = regexp.MustCompile("(LT|LL?L?L?|l{1,4}|Mo|MM?M?M?|Do|DDDo|DD?D?D?|ddd?d?|do?|w[o|w]?|W[o|W]?|YYYYY|YYYY|YY|gg(ggg?)?|GG(GGG?)?|e|E|a|A|hh?|HH?|mm?|ss?|SS?S?|X|zz?|ZZ?|Q)")
+
+var datePatternReplacements = map[string]string{
+	"M":    "1",                       // stdNumMonth 1 2 ... 11 12
+	"MM":   "01",                      // stdZeroMonth 01 02 ... 11 12
+	"MMM":  "Jan",                     // stdMonth Jan Feb ... Nov Dec
+	"MMMM": "January",                 // stdLongMonth January February ... November December
+	"D":    "2",                       // stdDay 1 2 ... 30 30
+	"DD":   "02",                      // stdZeroDay 01 02 ... 30 31
+	"DDD":  "<stdDayOfYear>",          // Day of the year 1 2 ... 364 365
+	"DDDD": "<stdDayOfYearZero>",      // Day of the year 001 002 ... 364 365 @todo****
+	"d":    "<stdDayOfWeek>",          // Numeric representation of day of the week 0 1 ... 5 6
+	"dd":   "Mon",                     // ***Su Mo ... Fr Sa @todo
+	"ddd":  "Mon",                     // Sun Mon ... Fri Sat
+	"dddd": "Monday",                  // stdLongWeekDay Sunday Monday ... Friday Saturday
+	"e":    "<stdDayOfWeek>",          // Numeric representation of day of the week 0 1 ... 5 6 @todo
+	"E":    "<stdDayOfWeekISO>",       // ISO-8601 numeric representation of the day of the week (added in PHP 5.1.0) 1 2 ... 6 7 @todo
+	"w":    "<stdWeekOfYear>",         // 1 2 ... 52 53
+	"ww":   "<stdWeekOfYear>",         // ***01 02 ... 52 53 @todo
+	"W":    "<stdWeekOfYear>",         // 1 2 ... 52 53
+	"WW":   "<stdWeekOfYear>",         // ***01 02 ... 52 53 @todo
+	"YY":   "06",                      // stdYear 70 71 ... 29 30
+	"YYYY": "2006",                    // stdLongYear 1970 1971 ... 2029 2030
+	"gg":   "<stdIsoYearShort>",       // ISO-8601 year number 70 71 ... 29 30
+	"gggg": "<stdIsoYear>",            // ***1970 1971 ... 2029 2030
+	"GG":   "<stdIsoYearShort>",       // 70 71 ... 29 30
+	"GGGG": "<stdIsoYear>",            // ***1970 1971 ... 2029 2030
+	"Q":    "<stdQuarter>",            // 1, 2, 3, 4
+	"A":    "PM",                      // stdPM AM PM
+	"a":    "pm",                      // stdpm am pm
+	"H":    "<stdHourNoZero>",         // stdHour 0 1 ... 22 23
+	"HH":   "15",                      // 00 01 ... 22 23
+	"h":    "3",                       // stdHour12 1 2 ... 11 12
+	"hh":   "03",                      // stdZeroHour12 01 02 ... 11 12
+	"m":    "4",                       // stdZeroMinute 0 1 ... 58 59
+	"mm":   "04",                      // stdZeroMinute 00 01 ... 58 59
+	"s":    "5",                       // stdSecond 0 1 ... 58 59
+	"ss":   "05",                      // stdZeroSecond ***00 01 ... 58 59
+	"z":    "MST",                     // EST CST ... MST PST
+	"zz":   "MST",                     // EST CST ... MST PST
+	"Z":    "Z07:00",                  // stdNumColonTZ -07:00 -06:00 ... +06:00 +07:00
+	"ZZ":   "-0700",                   // stdNumTZ -0700 -0600 ... +0600 +0700
+	"X":    "<stdUnix>",               // Seconds since unix epoch 1360013296
+	"LT":   "3:04 PM",                 // 8:30 PM
+	"L":    "01/02/2006",              // 09/04/1986
+	"l":    "1/2/2006",                // 9/4/1986
+	"ll":   "Jan 2 2006",              // Sep 4 1986
+	"lll":  "Jan 2 2006 3:04 PM",      // Sep 4 1986 8:30 PM
+	"llll": "Mon, Jan 2 2006 3:04 PM", // Thu, Sep 4 1986 8:30 PM
+}
+
+func patternToLayout(pattern string) string {
+	var match [][]string
+	if match = datePatternRegex.FindAllStringSubmatch(pattern, -1); match == nil {
+		return pattern
+	}
+
+	for i := range match {
+		if replace, ok := datePatternReplacements[match[i][0]]; ok {
+			pattern = strings.Replace(pattern, match[i][0], replace, 1)
+		}
+	}
+
+	return pattern
+}
+
+// FormatDateTime 时间正则匹配: 根据给定的格式字符串和时间戳，
 // 解析时区信息（如果存在）并应用到日期时间的格式化输出。
-func formatDateTime(formatStr string, timestamp time.Time) (string, error) {
-	switch formatStr {
-	case "${__from}":
-		t := timestamp.String()
-		return t, nil
-	case "${__from:date:seconds}":
-		t := timestamp.Unix()
-		return strconv.FormatInt(t, 10), nil
-	case "${__from:date:iso}":
-		// 默认使用 UTC 时间
-		t := timestamp.UTC()
-		return t.Format(time.RFC3339), nil
-
-	case "${__from:date}":
-		// 使用本地时间
-		t := timestamp.Local()
-		return t.Format("2006-01-02 15:04:05"), nil
-
-	default:
-		// 检查是否存在时区偏移量
-		re := regexp.MustCompile(`\$\{__from:date:iso([+-])(-?\d+)\}`)
+func FormatDateTime(formatStr string, timestamp time.Time) (string, error) {
+	hasTimeOffset := strings.Contains(strings.ToLower(formatStr), "utc")
+	loc := time.FixedZone("", 0)
+	if hasTimeOffset {
+		re := regexp.MustCompile(`.*?utc([+-])(\d+).*?`)
 		matches := re.FindStringSubmatch(formatStr)
 		fmt.Println("matches:", matches)
 		if len(matches) == 3 {
@@ -64,34 +114,29 @@ func formatDateTime(formatStr string, timestamp time.Time) (string, error) {
 			}
 
 			// 创建对应时区
-			loc := time.FixedZone("", int(offsetDuration.Seconds()))
-
-			// 使用给定的时间戳和时区进行格式化
-			t := timestamp.In(loc)
-			return t.Format("2006-01-02 15:04:05"), nil
+			loc = time.FixedZone("", int(offsetDuration.Seconds()))
 		}
-
-		return "", fmt.Errorf("unsupported format string: %s", formatStr)
 	}
+
+	pattern := time.RFC3339
+	re := regexp.MustCompile(`"(.+?)"`)
+	matches := re.FindStringSubmatch(formatStr)
+	if len(matches) > 1 {
+		format := matches[1]
+		pattern = patternToLayout(format)
+	}
+
+	return timestamp.In(loc).Format(pattern), nil
 }
 
-// formatDateTimeForQuery 根据给定的格式字符串、查询时间范围对象（queryTimeRange）和时间类型（fromOrTo），
+// FormatDateTimeForQuery 根据给定的格式字符串、查询时间范围对象（queryTimeRange）和时间类型（fromOrTo），
 // 格式化相应的时间（起始时间或结束时间）。
-func formatDateTimeForQuery(formatStr string, queryTimeRange QueryTimeRange, fromOrTo string) (string, error) {
+func FormatDateTimeForQuery(formatStr string, queryTimeRange backend.TimeRange) (string, error) {
 	timestamp := queryTimeRange.From
-	if fromOrTo == "to" {
+	// 如果formatStr包含"__to"，则使用结束时间，否则使用起始时间
+	// 并全部替换为__from
+	if strings.Contains(formatStr, "__time_to") {
 		timestamp = queryTimeRange.To
 	}
-
-	// 替换格式字符串中的 "__from" 为 "__to"
-	if fromOrTo == "to" {
-		formatStr = strings.ReplaceAll(formatStr, "${__from}", "${__to}")
-	}
-
-	return formatDateTime(formatStr, timestamp)
-}
-
-type QueryTimeRange struct {
-	From time.Time
-	To   time.Time
+	return FormatDateTime(formatStr, timestamp)
 }

@@ -171,7 +171,7 @@ func (apiDatasource *APIDatasource) BuildClient(setting *APISource, param map[st
 		}
 	} else {
 		keys := []string{"RegionId", "Region"}
-		region1, exists := getValueIgnoreCase(param, keys)
+		region1, exists := GetValueIgnoreCase(param, keys)
 		region, _ := region1.(string)
 		var endpoint string
 		if exists {
@@ -190,17 +190,17 @@ func (apiDatasource *APIDatasource) BuildClient(setting *APISource, param map[st
 }
 
 // 多层参数处理，eg array map
-func mapToQueryParams(data map[string]interface{}, prefix string, queries map[string]string) {
+func mapToQueryParams(data map[string]interface{}, prefix string, queries map[string]string, time backend.TimeRange) {
 	for key, value := range data {
 		newPrefix := key
 		if prefix != "" {
 			newPrefix = prefix + "." + key
 		}
-		processValue(value, newPrefix, queries)
+		processValue(value, newPrefix, queries, time)
 	}
 }
 
-func processValue(value interface{}, prefix string, queries map[string]string) {
+func processValue(value interface{}, prefix string, queries map[string]string, time backend.TimeRange) {
 	// log.DefaultLogger.Debug("processValue", "value", value, "prefix", prefix, "queries", queries)
 	rValue := reflect.ValueOf(value)
 	switch rValue.Kind() {
@@ -208,17 +208,27 @@ func processValue(value interface{}, prefix string, queries map[string]string) {
 		// 如果是map，则递归处理
 		for _, key := range rValue.MapKeys() {
 			newPrefix := fmt.Sprintf("%s.%v", prefix, key.String())
-			processValue(rValue.MapIndex(key).Interface(), newPrefix, queries)
+			processValue(rValue.MapIndex(key).Interface(), newPrefix, queries, time)
 		}
 	case reflect.Slice, reflect.Array:
 		// 如果是切片或数组，则遍历元素
 		for i := 0; i < rValue.Len(); i++ {
 			newPrefix := fmt.Sprintf("%s.%d", prefix, i+1)
-			processValue(rValue.Index(i).Interface(), newPrefix, queries)
+			processValue(rValue.Index(i).Interface(), newPrefix, queries, time)
 		}
 	default:
 		// 其他类型，直接将值转换为字符串
-		queries[prefix] = fmt.Sprintf("%v", value)
+		formatStr := fmt.Sprintf("%v", value)
+		if strings.Contains(formatStr, "${__time_from") || strings.Contains(formatStr, "${__time_to") {
+			formatStrTime, err := FormatDateTimeForQuery(formatStr, time)
+			if err != nil {
+				log.DefaultLogger.Error("Time format error", err)
+				break
+			}
+			formatStr = formatStrTime
+		}
+		queries[prefix] = formatStr
+		log.DefaultLogger.Debug("processValue", "prefix", prefix, "value", formatStr)
 	}
 }
 
@@ -277,7 +287,7 @@ func (apiDatasource *APIDatasource) QueryAPI(ch chan Result, query backend.DataQ
 	params := CreateApiInfo(queryInfo, setting)
 
 	queries := make(map[string]string)
-	mapToQueryParams(queryInfo.Params, "", queries)
+	mapToQueryParams(queryInfo.Params, "", queries, query.TimeRange)
 
 	log.DefaultLogger.Info("query params,", queries)
 	log.DefaultLogger.Info("API params,", params)

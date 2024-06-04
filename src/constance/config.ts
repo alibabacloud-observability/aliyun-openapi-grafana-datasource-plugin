@@ -66,9 +66,18 @@ export const ProductConfig: IProductConfig = {
     "reqBodyType": "json",
     "bodyType": "json"
   },
-  "schedulerx": {
-    "version": "2019-04-30",
-    "endpoint": "schedulerx.aliyuncs.com",
+  "rds":{
+    "version": "2014-08-15",
+    "endpoint": "rds.aliyuncs.com",
+    "style": "RPC",
+    "protocol": "HTTPS",
+    "pathName": "/",
+    "reqBodyType": "json",
+    "bodyType": "json"
+  },
+  "slb": {
+    "version": "2014-05-15",
+    "endpoint": "slb.[regionId].aliyuncs.com",
     "style": "RPC",
     "protocol": "HTTPS",
     "pathName": "/",
@@ -77,11 +86,38 @@ export const ProductConfig: IProductConfig = {
   },
   "cs": {
     "version": "2015-12-15",
-    "endpoint": "cs.[regionid].aliyuncs.com",
+    "endpoint": "cs.[regionId].aliyuncs.com",
     "style": "ROA",
     "protocol": "HTTPS",
     "pathName": "/api/v1/clusters",
     "reqBodyType": "json",
     "bodyType": "json"
+  },
+  "vpc":{
+    "version": "2016-04-28",
+    "endpoint": "vpc.[regionId].aliyuncs.com",
+    "style": "RPC",
+    "protocol": "HTTPS",
+    "pathName": "/",
+    "reqBodyType": "json",
+    "bodyType": "json"
+  },
+  "cms": {
+    "version": "2019-01-01",
+    "endpoint": "metrics.[regionId].aliyuncs.com",
+    "style": "RPC",
+    "protocol": "HTTPS",
+    "pathName": "/",
+    "reqBodyType": "json",
+    "bodyType": "json"
+  },
+  "schedulerx": {
+    "version": "2019-04-30",
+        "endpoint": "schedulerx.aliyuncs.com",
+        "style": "RPC",
+        "protocol": "HTTPS",
+        "pathName": "/",
+        "reqBodyType": "json",
+        "bodyType": "json"
   }
 }

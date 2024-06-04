@@ -158,7 +158,7 @@ export class OpenAPIConfigEditor extends PureComponent<Props, State> {
           productConfigs.map((product, index) => (
             <ProductConfigItemEditor
               product={product}
-              key={JSON.stringify(product)}
+              key={`${JSON.stringify(product)}-${index}`}
               addProduct={() => this.addProduct()}
               remove={() => this.removeProduct(index)}
               index={index}

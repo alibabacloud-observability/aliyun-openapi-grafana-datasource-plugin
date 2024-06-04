@@ -98,8 +98,8 @@ const ProductConfigItemEditor = ({
   return (
     <div>
       <InlineFieldRow>
-        <div className='gf-form-label' style={{ width: '32px', padding: '0 8px 0 12px'}} onClick={addProduct}>+</div>
-        <div className='gf-form-label' style={{ width: '32px', padding: '0 8px 0 12px'}} onClick={remove}>-</div>
+        <div className='gf-form-label' style={{ width: '32px', padding: '0 8px 0 12px', cursor: 'pointer'}} onClick={addProduct}>+</div>
+        <div className='gf-form-label' style={{ width: '32px', padding: '0 8px 0 12px', cursor: 'pointer'}} onClick={remove}>-</div>
         <InlineField label="Product" labelWidth={8}>
           <Select
             width={33}
